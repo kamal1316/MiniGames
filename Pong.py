@@ -43,8 +43,8 @@ ball.color("white")
 ball.penup()
 ball.goto(0, 0)
 #Every time balls move by 2 pixels
-ball.dx = 0.6
-ball.dy = 0.6
+ball.dx = 0.8
+ball.dy = 0.8
 
 #Pen
 pen = turtle.Turtle()
