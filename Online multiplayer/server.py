@@ -1,12 +1,14 @@
+import pickle
 import socket
 from _thread import *
-import sys
+from game import Game
 
 server = "192.168.1.39"
 # This port is usually open to use
 port = 5555
 
 # Setting Up the socket
+# SOCK_STREAM means using TCP type
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
     s.bind((server, port))
@@ -14,34 +16,45 @@ except socket.error as e:
     str(e)
 
 # listening for connections
-s.listen(2)
+s.listen()
 print("Waiting for a connection, Server Started")
+connected = set()
+games = {}
+idCount = 0
 
 
-def threaded_client(conn):
-    conn.send(str.encode("Connected"))
+def threaded_client(conn, p, gameId):
+    global  idCount
+    conn.send(str.encode(str(p)))
+
     reply = ""
-    # Run continously while client is connected
     while True:
         try:
-            # 2048 = amount of information recieving(in bits)
-            data = conn.recv(2048)
-            # We will receive encode info, so we have to decode it
-            reply = data.decode("utf-8")
+            data = conn.recv(4096).decode()
 
-            if not data:
-                print("Disconnected")
-                break
+            if gameId in games:
+                game = games[gameId]
+
+                if not data:
+                    break
+                else:
+                    if data == "reset":
+                        game.resetWent()
+                    elif data != "get":
+                        game.play(p, data)
+                    reply = game
+                    conn.sendall(pickle.dumps(reply))
             else:
-                print("Recieved: ", reply)
-                print("Sending: ", reply)
-
-            # Always encoded information should be sent through server
-            conn.sendall(str.encode(reply))
+                break
         except:
             break
-
     print("Lost connection")
+    try:
+        del games[gameId]
+        print("Closing Game:", gameId)
+    except:
+        pass
+    idCount -= 1
     conn.close()
 
 
@@ -50,7 +63,17 @@ while True:
     # s.accept() will accept any incoming connections
     conn, addr = s.accept()
     print("Connected to:", addr)
-    start_new_thread(threaded_client, (conn, ))
 
+    idCount += 1
+    p = 0
+    gameId = (idCount - 1) // 2
+    if idCount % 2 == 1:
+        games[gameId] = Game(gameId)
+        print("Creating a new game..")
+    else:
+        games[gameId].ready = True
+        p = 1
+
+    start_new_thread(threaded_client, (conn, p, gameId))
 
 
